@@ -78,7 +78,9 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          brew install ldid dpkg make wget unzip jq pipx
+          brew install ldid dpkg make wget unzip jq pipx dav1d libvpx
+          echo "CPPFLAGS=-I$(brew --prefix dav1d)/include -I$(brew --prefix libvpx)/include" >> "$GITHUB_ENV"
+          echo "LDFLAGS=-L$(brew --prefix dav1d)/lib -L$(brew --prefix libvpx)/lib" >> "$GITHUB_ENV"
 
       - name: Set PATH
         run: echo "$(brew --prefix make)/libexec/gnubin" >> $GITHUB_PATH
@@ -166,12 +168,18 @@ jobs:
       - name: Fix compiling & Build Package
         id: build_package
         run: |
+          set -euo pipefail
           cd main
+
+          export CPPFLAGS="${CPPFLAGS:-} -I$(brew --prefix dav1d)/include -I$(brew --prefix libvpx)/include"
+          export LDFLAGS="${LDFLAGS:-} -L$(brew --prefix dav1d)/lib -L$(brew --prefix libvpx)/lib"
+
           sed -i '' "s/^BUNDLE_ID .*/BUNDLE_ID = ${{ inputs.bundle_id }}/" Makefile || echo "BUNDLE_ID = ${{ inputs.bundle_id }}" >> Makefile
           sed -i '' "s/^DISPLAY_NAME .*/DISPLAY_NAME = ${{ inputs.app_name }}/" Makefile || echo "DISPLAY_NAME = ${{ inputs.app_name }}" >> Makefile
           sed -i '' "s/^export TARGET .*/export TARGET = iphone:clang:${{ inputs.sdk_version }}:16.0/" Makefile || echo "export TARGET = iphone:clang:${{ inputs.sdk_version }}:16.0" >> Makefile
+
           make package THEOS_PACKAGE_SCHEME=rootless IPA=Payload/YouTube.app FINALPACKAGE=1 YTUHD_ENABLED=${{ inputs.ytuhd && '1' || '0' }} SPONSORBLOCK_ENABLED=${{ inputs.sponsorblock && '1' || '0' }}
-          echo "package=$(ls -t packages | head -n1)" >> $GITHUB_OUTPUT
+          echo "package=$(ls -t packages | head -n1)" >> "$GITHUB_OUTPUT"
 
         env:
           THEOS: ${{ github.workspace }}/theos
